@@ -1,19 +1,7 @@
-# Modern Note-Taking Application
+# Parking Lot
 
 A sleek, responsive note-taking application built with a modern stack.
 
-## Architecture
-
-- **Frontend**: React with TypeScript, styled with custom Vanilla CSS for a polished, "native" feel.
-- **Backend**: FastAPI (Python) hosted on [Modal](https://modal.com), providing a high-performance serverless API.
-- **Storage**: Currently using **In-Memory Storage** for demonstration purposes (as requested to skip DB setup for now). This ensures zero-config execution and rapid prototyping.
-
-## Key Features
-
-- **Clean UI**: Minimalist design focused on writing and organization.
-- **Real-time Updates**: Instant note list updates and snippets.
-- **Cross-Platform Potential**: Built as a responsive web app.
-- **Serverless Backend**: Scalable and easy to deploy via Modal.
 
 ## Getting Started
 
