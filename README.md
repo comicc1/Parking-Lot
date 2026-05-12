@@ -35,5 +35,3 @@ By default, the frontend expects the API at `http://localhost:8000`. You can ove
 - `.devcontainer/`: Standardized development environment configuration.
 
 ---
-
-*Note: This is a prototype version with in-memory storage. Future iterations will include persistent storage using SQLite or a cloud database.*
