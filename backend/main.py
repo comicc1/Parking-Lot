@@ -5,27 +5,22 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import modal
 
-# Modal Setup
 app = modal.App("note-taking-app")
 
-# Pydantic Models
 class Note(BaseModel):
     id: Optional[int] = None
     title: str
     content: str
 
-# In-Memory Storage (Temporary, as requested)
 notes_db: Dict[int, Note] = {}
 next_id = 1
 
-# FastAPI App
 web_app = FastAPI()
 
 @web_app.get("/")
 def read_root():
     return {"message": "Welcome to the Notes API. Visit /notes for the data."}
 
-# CORS Setup
 web_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
