@@ -1,31 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import { createNote as createNoteRequest, deleteNote as deleteNoteRequest, fetchNotes, updateNote as updateNoteRequest } from './api'
 import type { Note } from './types'
-
-const STORAGE_KEY = 'parking-lot-local-notes'
-
-const STARTER_NOTES: Note[] = [
-  {
-    id: 1,
-    title: 'Sprint check-in',
-    content:
-      '# Today\n\n- Build local-first notes experience\n- Match an Obsidian-style workspace\n- Keep backend optional for now\n\n## Update\nThe prototype is saving notes in localStorage and is ready for frontend demo review.',
-    updatedAt: Date.now() - 1000 * 60 * 14,
-    createdAt: Date.now() - 1000 * 60 * 60,
-    tags: ['work', 'update'],
-    pinned: true,
-  },
-  {
-    id: 2,
-    title: 'Ideas vault',
-    content:
-      '## Note directions\n\nUse this space for rough ideas, meeting notes, and quick capture.\n\n[[Local vault]]\n[[Daily note]]',
-    updatedAt: Date.now() - 1000 * 60 * 90,
-    createdAt: Date.now() - 1000 * 60 * 120,
-    tags: ['ideas'],
-    pinned: false,
-  },
-]
 
 const EMPTY_NOTE: Note = {
   id: 0,
@@ -35,11 +11,6 @@ const EMPTY_NOTE: Note = {
   createdAt: 0,
   tags: [],
   pinned: false,
-}
-
-function loadInitialNotes() {
-  const saved = localStorage.getItem(STORAGE_KEY)
-  return saved ? (JSON.parse(saved) as Note[]) : STARTER_NOTES
 }
 
 function formatDate(timestamp: number) {
@@ -60,16 +31,56 @@ function parseTags(value: string) {
 }
 
 function App() {
-  const [notes, setNotes] = useState<Note[]>(loadInitialNotes)
-  const [activeNoteId, setActiveNoteId] = useState<number>(() => loadInitialNotes()[0]?.id ?? 0)
-  const [draft, setDraft] = useState<Note>(() => loadInitialNotes()[0] ?? EMPTY_NOTE)
+  const [notes, setNotes] = useState<Note[]>([])
+  const [activeNoteId, setActiveNoteId] = useState<number>(0)
+  const [draft, setDraft] = useState<Note>(EMPTY_NOTE)
   const [search, setSearch] = useState('')
   const [selectedTag, setSelectedTag] = useState('all')
   const [vaultHidden, setVaultHidden] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
-  }, [notes])
+    let ignore = false
+
+    async function load() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const nextNotes = await fetchNotes()
+
+        if (ignore) {
+          return
+        }
+
+        setNotes(nextNotes)
+
+        if (nextNotes.length > 0) {
+          setActiveNoteId(nextNotes[0].id)
+          setDraft(nextNotes[0])
+        } else {
+          setActiveNoteId(0)
+          setDraft(EMPTY_NOTE)
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load notes')
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const normalizedSearch = search.trim().toLowerCase()
 
@@ -81,8 +92,7 @@ function App() {
         note.content.toLowerCase().includes(normalizedSearch) ||
         note.tags.some((tag) => tag.includes(normalizedSearch))
 
-      const matchesTag =
-        selectedTag === 'all' ? true : note.tags.includes(selectedTag)
+      const matchesTag = selectedTag === 'all' ? true : note.tags.includes(selectedTag)
 
       return matchesSearch && matchesTag
     })
@@ -90,6 +100,7 @@ function App() {
       if (a.pinned !== b.pinned) {
         return a.pinned ? -1 : 1
       }
+
       return b.updatedAt - a.updatedAt
     })
 
@@ -101,9 +112,10 @@ function App() {
   function openNote(note: Note) {
     setActiveNoteId(note.id)
     setDraft(note)
+    setError(null)
   }
 
-  function saveDraft(partial?: Partial<Note>) {
+  async function saveDraft(partial?: Partial<Note>) {
     const nextDraft = {
       ...draft,
       ...partial,
@@ -117,58 +129,76 @@ function App() {
       return
     }
 
-    if (nextDraft.id) {
-      const updated: Note = {
-        ...nextDraft,
-        title: nextDraft.title.trim() || 'Untitled',
-        updatedAt: Date.now(),
+    setSaving(true)
+    setError(null)
+
+    try {
+      if (nextDraft.id) {
+        const updated = await updateNoteRequest(nextDraft.id, {
+          title: nextDraft.title.trim() || 'Untitled',
+          content: nextDraft.content,
+          tags: nextDraft.tags,
+          pinned: nextDraft.pinned,
+        })
+
+        setNotes((current) => current.map((note) => (note.id === updated.id ? updated : note)))
+        setDraft(updated)
+        setActiveNoteId(updated.id)
+        return
       }
 
-      setNotes((current) =>
-        current.map((note) => (note.id === updated.id ? updated : note)),
-      )
-      setDraft(updated)
-      return
-    }
+      const created = await createNoteRequest({
+        title: nextDraft.title.trim() || 'Untitled',
+        content: nextDraft.content,
+        tags: nextDraft.tags,
+        pinned: nextDraft.pinned,
+      })
 
-    const created: Note = {
-      ...nextDraft,
-      id: Date.now(),
-      title: nextDraft.title.trim() || 'Untitled',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      setNotes((current) => [created, ...current])
+      setDraft(created)
+      setActiveNoteId(created.id)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save note')
+    } finally {
+      setSaving(false)
     }
-
-    setNotes((current) => [created, ...current])
-    openNote(created)
   }
 
-  function createNote() {
-    const fresh: Note = {
+  function createDraft() {
+    setActiveNoteId(0)
+    setDraft({
       ...EMPTY_NOTE,
-      id: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       tags: selectedTag !== 'all' ? [selectedTag] : [],
-    }
-
-    setActiveNoteId(0)
-    setDraft(fresh)
+    })
+    setError(null)
   }
 
-  function deleteNote() {
+  async function deleteNote() {
     if (!draft.id) {
       setDraft(EMPTY_NOTE)
       return
     }
 
-    const remaining = notes.filter((note) => note.id !== draft.id)
-    setNotes(remaining)
-    if (remaining.length) {
-      openNote(remaining[0])
-    } else {
-      setActiveNoteId(0)
-      setDraft(EMPTY_NOTE)
+    setSaving(true)
+    setError(null)
+
+    try {
+      await deleteNoteRequest(draft.id)
+      const remaining = notes.filter((note) => note.id !== draft.id)
+      setNotes(remaining)
+
+      if (remaining.length > 0) {
+        openNote(remaining[0])
+      } else {
+        setActiveNoteId(0)
+        setDraft(EMPTY_NOTE)
+      }
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete note')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -183,7 +213,7 @@ function App() {
         </div>
 
         <div className="vault-toolbar">
-          <button className="tool-button" onClick={createNote} title="New note">
+          <button className="tool-button" onClick={createDraft} title="New note">
             <span>+</span>
           </button>
           <label className="search-panel">
@@ -222,15 +252,27 @@ function App() {
           <div className="pane-header">
             <div>
               <p className="eyebrow">Notes</p>
-              <h2>{filteredNotes.length} files</h2>
+              <h2>{loading ? 'Loading...' : `${filteredNotes.length} files`}</h2>
             </div>
             <div className="vault-stat">
               <span>{notes.filter((note) => note.pinned).length} pinned</span>
             </div>
           </div>
 
+          {error ? (
+            <div className="empty-panel">
+              <h3>Connection issue</h3>
+              <p>{error}</p>
+            </div>
+          ) : null}
+
           <div className="note-list">
-            {filteredNotes.length ? (
+            {loading ? (
+              <div className="empty-panel">
+                <h3>Loading notes</h3>
+                <p>Loading your local notes from this browser.</p>
+              </div>
+            ) : filteredNotes.length ? (
               filteredNotes.map((note) => (
                 <button
                   key={note.id}
@@ -248,8 +290,8 @@ function App() {
               ))
             ) : (
               <div className="empty-panel">
-                <h3>No notes match</h3>
-                <p>Try a different search or create a new note.</p>
+                <h3>No notes yet</h3>
+                <p>Create your first note to start storing it locally.</p>
               </div>
             )}
           </div>
@@ -270,14 +312,15 @@ function App() {
               </button>
               <button
                 className={`ghost-button ${draft.pinned ? 'active' : ''}`}
-                onClick={() => saveDraft({ pinned: !draft.pinned })}
+                onClick={() => void saveDraft({ pinned: !draft.pinned })}
+                disabled={saving}
               >
                 {draft.pinned ? 'Unpin' : 'Pin'}
               </button>
-              <button className="ghost-button" onClick={() => saveDraft()}>
-                Save
+              <button className="ghost-button" onClick={() => void saveDraft()} disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
               </button>
-              <button className="danger-button" onClick={deleteNote}>
+              <button className="danger-button" onClick={() => void deleteNote()} disabled={saving}>
                 Delete
               </button>
             </div>
@@ -289,7 +332,7 @@ function App() {
               <input
                 value={draft.tags.join(', ')}
                 onChange={(event) => setDraft({ ...draft, tags: parseTags(event.target.value) })}
-                onBlur={() => saveDraft()}
+                onBlur={() => void saveDraft()}
                 placeholder="work, ideas, personal"
               />
             </label>
@@ -307,14 +350,14 @@ function App() {
                 placeholder="Untitled"
                 value={draft.title}
                 onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                onBlur={() => saveDraft()}
+                onBlur={() => void saveDraft()}
               />
               <textarea
                 className="content-input"
                 placeholder="Start writing. Supports headings, lists, checkboxes, and [[wiki links]]."
                 value={draft.content}
                 onChange={(event) => setDraft({ ...draft, content: event.target.value })}
-                onBlur={() => saveDraft()}
+                onBlur={() => void saveDraft()}
               />
             </section>
           </div>

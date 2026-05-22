@@ -1,37 +1,55 @@
 # Parking Lot
 
-A sleek, responsive note-taking application built with a modern stack.
+Parking Lot is a React notes app designed for a simple Vercel deployment.
 
+## Stack
 
-## Getting Started
+- `frontend/`: React + TypeScript + Vite
+- Vercel: static hosting for the frontend
+- Browser `localStorage`: note persistence for the current device/browser
 
-### Prerequisites
+## Features
 
-- Python 3.11+
-- Node.js 20+
-- [Modal CLI](https://modal.com/docs/guide) installed and configured (`pip install modal && modal setup`)
+- Create, edit, pin, and delete notes
+- Filter notes by tag and search across titles, content, and tags
+- Persist notes locally without needing a separate backend service
 
-### Running Locally
+## Frontend
 
-#### 1. Start the Backend
-```bash
-cd backend
-modal serve main.py
-```
-This will start the FastAPI app and provide a local URL (typically `http://localhost:8000` or a Modal-specific tunnel).
+The app lives in `frontend/` and can be developed or deployed independently.
 
-#### 2. Start the Frontend
+## Local Setup
+
+### 1. Run the frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-By default, the frontend expects the API at `http://localhost:8000`. You can override this by setting `VITE_API_URL` in an `.env` file.
 
-## Project Structure
+If PowerShell blocks `npm`, use:
 
-- `frontend/`: React application and styles.
-- `backend/`: FastAPI application and Modal deployment script.
-- `.devcontainer/`: Standardized development environment configuration.
+```bash
+cd frontend
+cmd.exe /c npm.cmd install
+cmd.exe /c npm.cmd run dev
+```
 
----
+## Vercel Deployment
+
+Deploy the `frontend` app on Vercel.
+
+1. Import this GitHub repo into Vercel.
+2. Set the project root directory to `frontend`.
+3. Keep the default Vite build settings, or use:
+
+```bash
+Build command: npm run build
+Output directory: dist
+```
+
+## Notes
+
+- The current recommended stack for this project is React + Vercel.
+- The `backend/` folder can stay in the repo while the frontend ships independently.
