@@ -23,7 +23,8 @@
 .note-card-top,
 .note-card-bottom,
 .meta-bar,
-.toolbar-actions {
+.toolbar-actions,
+.mode-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -279,6 +280,11 @@
   color: #f0e8ff;
 }
 
+.compact-button {
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
 .danger-button {
   color: #f3d5ff;
   background: rgba(132, 88, 255, 0.14);
@@ -342,6 +348,101 @@
   line-height: 1.7;
 }
 
+.content-view {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 28px 32px;
+  color: #ddd3f2;
+  line-height: 1.85;
+}
+
+.content-view p {
+  margin: 0 0 1rem;
+}
+
+.content-spacer {
+  height: 0.9rem;
+}
+
+.empty-view-state {
+  display: grid;
+  place-content: center;
+  min-height: 100%;
+  color: #ab9ec8;
+  text-align: center;
+}
+
+.empty-view-state h3 {
+  margin: 0 0 8px;
+  color: #f4efff;
+}
+
+.empty-view-state p {
+  margin: 0;
+}
+
+.wiki-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0.12rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #cfb9ff;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(171, 132, 255, 0.46);
+  text-underline-offset: 0.14em;
+}
+
+.wiki-link:hover {
+  color: #eddfff;
+  background: transparent;
+}
+
+.wiki-link-preview {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 12px);
+  z-index: 10;
+  width: min(280px, 70vw);
+  padding: 12px 14px;
+  border: 1px solid rgba(160, 126, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(18, 17, 29, 0.96);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.32);
+  color: #e6ddf8;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.wiki-link:hover .wiki-link-preview,
+.wiki-link:focus-visible .wiki-link-preview {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.wiki-link-preview strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #faf6ff;
+  font-weight: 600;
+}
+
+.wiki-link-preview p {
+  margin: 0;
+  color: #baadd7;
+  line-height: 1.55;
+  text-align: left;
+}
+
 .empty-panel {
   margin: auto 0;
   padding: 26px 16px;
@@ -377,8 +478,10 @@
     flex-direction: column;
   }
 
+  .mode-toggle,
   .meta-stats,
   .toolbar-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }

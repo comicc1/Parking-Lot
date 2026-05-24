@@ -30,6 +30,66 @@ function parseTags(value: string) {
     .filter((tag, index, arr) => arr.indexOf(tag) === index)
 }
 
+function normalizeTitle(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function excerpt(value: string, maxLength = 160) {
+  const clean = value.replace(/\s+/g, ' ').trim()
+
+  if (!clean) {
+    return 'Empty note'
+  }
+
+  if (clean.length <= maxLength) {
+    return clean
+  }
+
+  return `${clean.slice(0, maxLength).trimEnd()}...`
+}
+
+function splitWikiLinkTarget(value: string) {
+  return value.trim()
+}
+
+type ContentPart =
+  | { type: 'text'; value: string }
+  | { type: 'link'; value: string }
+
+function parseWikiContent(content: string): ContentPart[] {
+  const parts: ContentPart[] = []
+  const pattern = /\[\[([^[\]]+)\]\]/g
+  let lastIndex = 0
+
+  for (const match of content.matchAll(pattern)) {
+    const start = match.index ?? 0
+    const fullMatch = match[0]
+    const target = splitWikiLinkTarget(match[1] ?? '')
+
+    if (start > lastIndex) {
+      parts.push({ type: 'text', value: content.slice(lastIndex, start) })
+    }
+
+    if (target) {
+      parts.push({ type: 'link', value: target })
+    } else {
+      parts.push({ type: 'text', value: fullMatch })
+    }
+
+    lastIndex = start + fullMatch.length
+  }
+
+  if (lastIndex < content.length) {
+    parts.push({ type: 'text', value: content.slice(lastIndex) })
+  }
+
+  if (parts.length === 0) {
+    parts.push({ type: 'text', value: content })
+  }
+
+  return parts
+}
+
 function App() {
   const [notes, setNotes] = useState<Note[]>([])
   const [activeNoteId, setActiveNoteId] = useState<number>(0)
@@ -40,6 +100,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editorMode, setEditorMode] = useState<'edit' | 'view'>('edit')
 
   useEffect(() => {
     let ignore = false
@@ -108,11 +169,76 @@ function App() {
   const activeNote = notes.find((note) => note.id === activeNoteId)
   const wordCount = draft.content.trim() ? draft.content.trim().split(/\s+/).length : 0
   const charCount = draft.content.length
-
+  const noteByTitle = new Map(notes.map((note) => [normalizeTitle(note.title), note]))
   function openNote(note: Note) {
     setActiveNoteId(note.id)
     setDraft(note)
     setError(null)
+  }
+
+  function openOrCreateLinkedNote(title: string) {
+    const normalizedTitle = normalizeTitle(title)
+    const existing = noteByTitle.get(normalizedTitle)
+
+    if (existing) {
+      openNote(existing)
+      return
+    }
+
+    setActiveNoteId(0)
+    setDraft({
+      ...EMPTY_NOTE,
+      title: title.trim(),
+      content: '',
+    })
+    setEditorMode('edit')
+    setError(null)
+  }
+
+  function renderContentPreview() {
+    if (!draft.content.trim()) {
+      return (
+        <div className="empty-view-state">
+          <h3>Nothing here yet</h3>
+          <p>Write in edit mode, then open view mode to follow wiki links.</p>
+        </div>
+      )
+    }
+
+    return draft.content.split('\n').map((line, lineIndex) => {
+      const lineParts = parseWikiContent(line)
+
+      if (!line.trim()) {
+        return <div key={`line-${lineIndex}`} className="content-spacer" />
+      }
+
+      return (
+        <p key={`line-${lineIndex}`}>
+          {lineParts.map((part, partIndex) => {
+            if (part.type === 'text') {
+              return <span key={`part-${lineIndex}-${partIndex}`}>{part.value}</span>
+            }
+
+            const linkedNote = noteByTitle.get(normalizeTitle(part.value))
+
+            return (
+              <button
+                key={`part-${lineIndex}-${partIndex}`}
+                type="button"
+                className="wiki-link"
+                onClick={() => openOrCreateLinkedNote(part.value)}
+              >
+                <span>{`[[${part.value}]]`}</span>
+                <span className="wiki-link-preview" role="tooltip">
+                  <strong>{part.value}</strong>
+                  <p>{linkedNote ? excerpt(linkedNote.content) : 'No page yet. Click to create it.'}</p>
+                </span>
+              </button>
+            )
+          })}
+        </p>
+      )
+    })
   }
 
   async function saveDraft(partial?: Partial<Note>) {
@@ -304,6 +430,22 @@ function App() {
               <h2>{activeNote ? 'Active note' : 'Untitled draft'}</h2>
             </div>
             <div className="toolbar-actions">
+              <div className="mode-toggle" role="tablist" aria-label="Editor mode">
+                <button
+                  type="button"
+                  className={`ghost-button compact-button ${editorMode === 'edit' ? 'active' : ''}`}
+                  onClick={() => setEditorMode('edit')}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className={`ghost-button compact-button ${editorMode === 'view' ? 'active' : ''}`}
+                  onClick={() => setEditorMode('view')}
+                >
+                  View
+                </button>
+              </div>
               <button
                 className="ghost-button"
                 onClick={() => setVaultHidden((current) => !current)}
@@ -352,13 +494,17 @@ function App() {
                 onChange={(event) => setDraft({ ...draft, title: event.target.value })}
                 onBlur={() => void saveDraft()}
               />
-              <textarea
-                className="content-input"
-                placeholder="Start writing. Supports headings, lists, checkboxes, and [[wiki links]]."
-                value={draft.content}
-                onChange={(event) => setDraft({ ...draft, content: event.target.value })}
-                onBlur={() => void saveDraft()}
-              />
+              {editorMode === 'edit' ? (
+                <textarea
+                  className="content-input"
+                  placeholder="Start writing. Supports headings, lists, checkboxes, and [[wiki links]]."
+                  value={draft.content}
+                  onChange={(event) => setDraft({ ...draft, content: event.target.value })}
+                  onBlur={() => void saveDraft()}
+                />
+              ) : (
+                <article className="content-view">{renderContentPreview()}</article>
+              )}
             </section>
           </div>
         </main>
