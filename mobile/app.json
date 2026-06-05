@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Parking Lot",
+    "slug": "parking-lot-mobile",
+    "scheme": "parkinglot",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.anonymous.parkinglotmobile"
+    }
+  }
+}
